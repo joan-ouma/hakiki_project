@@ -10,20 +10,6 @@ load_dotenv()
 whisper_pipeline = None
 vit_pipeline = None
 
-def _load_whisper():
-    global whisper_pipeline
-    if whisper_pipeline is None:
-        print("Loading Whisper Swahili locally...")
-        device = 0 if torch.cuda.is_available() else -1
-        # Using the iLabAfrica model confirmed in Phase 0
-        whisper_pipeline = pipeline(
-            "automatic-speech-recognition", 
-            model="PaschalK/whisper-swahili-small",
-            device=device,
-            use_auth_token=os.getenv("HF_API_KEY")
-        )
-    return whisper_pipeline
-
 def _load_vit():
     global vit_pipeline
     if vit_pipeline is None:
@@ -38,21 +24,32 @@ def _load_vit():
     return vit_pipeline
 
 def _process_audio_sync(audio_bytes: bytes) -> str:
-    """Synchronous function to transcribe audio via Whisper."""
-    pipe = _load_whisper()
-    # The pipeline can accept a dict or just bytes if it supports it, 
-    # but usually expects a file path or numpy array. 
-    # For robust production, write bytes to a temp file first.
+    """Synchronous function to transcribe audio via Groq Whisper."""
     import tempfile
+    from groq import Groq
+    
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        print("Warning: GROQ_API_KEY not found. Skipping audio transcription.")
+        return ""
+        
+    client = Groq(api_key=api_key)
+    
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp.write(audio_bytes)
         tmp_path = tmp.name
     
     try:
-        result = pipe(tmp_path)
-        return result.get("text", "")
+        with open(tmp_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(tmp_path), file.read()),
+                model="whisper-large-v3",
+                prompt="Specify language as Swahili if applicable.", 
+                response_format="json",
+            )
+        return transcription.text
     except Exception as e:
-        print(f"Whisper inference error: {e}")
+        print(f"Groq Whisper inference error: {e}")
         return ""
     finally:
         os.remove(tmp_path)

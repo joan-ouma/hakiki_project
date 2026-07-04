@@ -8,7 +8,8 @@ def match_seed_db(claim: str) -> dict | None:
     """Simple keyword match against seed records."""
     db = sqlite3.connect(str(DB_PATH))
     db.row_factory = sqlite3.Row
-    words = [w for w in claim.lower().split() if len(w) > 3]
+    import re
+    words = [w for w in re.findall(r'[a-z]+', claim.lower()) if len(w) > 3]
     if not words:
         db.close()
         return None

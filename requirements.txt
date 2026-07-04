@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+twilio
+africastalking
+huggingface_hub
+transformers
+requests
+httpx
+anthropic
+firecrawl-py
+python-dotenv
+pydantic
+torch
+torchvision
+torchaudio
+python-multipart

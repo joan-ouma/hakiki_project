@@ -40,14 +40,18 @@ def compose_verdict(claim: str | None, matches: dict | None, media_result: dict 
     # Media analysis results
     if media_result:
         if media_result.get("error"):
-            parts.append(f"MEDIA CHECK: Could not analyze image ({media_result['error']})")
+            parts.append("We couldn't analyze this image right now. Try again later.")
         else:
-            label = media_result.get("label", "unknown")
             prob = media_result.get("ai_probability", 0)
-            parts.append("MEDIA AUTHENTICITY CHECK:")
-            parts.append(f"  Verdict: {label}")
-            parts.append(f"  AI-generation probability: {prob:.0%}")
-            parts.append("  Model: ViT-based classifier (generic, not dialect-specific)")
+            if prob > 0.7:
+                parts.append(f"This image appears to be AI-generated or manipulated ({prob:.0%} confidence).")
+                parts.append("Be cautious sharing it as evidence.")
+            elif prob < 0.3:
+                parts.append(f"This image appears authentic ({1-prob:.0%} confidence).")
+                parts.append("No signs of AI manipulation detected.")
+            else:
+                parts.append(f"We can't tell if this image is real or AI-generated (confidence too low at {prob:.0%}).")
+                parts.append("Consider verifying with other sources before sharing.")
             parts.append("")
 
     parts.append("-- Hakiki Bot (automated, not legal advice)")

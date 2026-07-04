@@ -4,6 +4,7 @@ from fastapi.responses import PlainTextResponse
 
 from src.engine.claim import extract_claim
 from src.engine.match import match_claim
+from src.privacy import hash_phone
 
 router = APIRouter(prefix="/webhook")
 
@@ -76,9 +77,9 @@ def _send_sms(to: str, message: str):
     sms = africastalking.SMS
     try:
         resp = sms.send(message, [to])
-        print(f"[AT SMS] Response: {resp}")
+        print(f"[AT SMS] Sent to {hash_phone(to)}: {resp.get('SMSMessageData', {}).get('Message', '')}")
     except Exception as e:
-        print(f"[AT SMS] Error: {e}")
+        print(f"[AT SMS] Error for {hash_phone(to)}: {e}")
 
 
 # --- USSD ---

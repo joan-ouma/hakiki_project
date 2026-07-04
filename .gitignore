@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Hakiki generated data
+data/hakiki.db
+data/seed/*.md
+
+.agents/
+skills-lock.json
+.claude/

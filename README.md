@@ -1,4 +1,4 @@
-# Hakiki Project
+# Hakiki
 
 > Built during the **Democracy & AI Hackathon** — July 4th, 2026
 > Hosted by **Mozilla Foundation** & **KamiLimu**
@@ -9,10 +9,11 @@
 
 | Name | Role | GitHub |
 |------|------|--------|
-| [Full Name] | [Role, e.g. ML Engineer] | [@handle] |
-| [Full Name] | [Role, e.g. Backend] | [@handle] |
+| Addy Mutuiri| Backend Engineer | [@Addy](https://github.com/mutuiris) |
+| Joan Ouma| Full-Stack Developer | [@Joan](https://github.com/joan-ouma)
+|
 
-**Team Name:** [Insert Team Name]
+**Team Name:** T004
 **University:** [Insert University Name]
 
 ---

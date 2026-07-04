@@ -20,7 +20,12 @@
 ## Problem & User
 
 ### Problem Statement
-First-time Generation Z and rural voters in Kenya face significant exposure to unverified, AI-manipulated political content and deepfakes on platforms like WhatsApp and TikTok, evidenced by a 2025 Reuters Institute report finding that 55% of Kenyan users identify TikTok as the leading source of false information. This problem is primarily caused by the fact that standard AI detection tools are built with a Western-centric bias and lack training data for African cultural subtleties and regional dialects, supported by the CIPESA THRAETS 2025 report highlighting the failure of global algorithms in the Global South. Despite the existence of local fact-checking organizations, their verification tools are typically desktop based or English heavy, creating a last-mile delivery failure for users who receive deepfakes directly on mobile messaging apps. A WhatsApp-native verification chatbot that uses a localized, open-weights AI model to analyze media in Kenyan dialects could significantly reduce the viral re-sharing of synthetic political content before the 2027 elections, while ensuring user privacy against digital surveillance by systematically discarding all personal metadata upon use.
+First time Generation Z voters aged 18 - 29 in Kenya, especially those who consume political
+narratives on TikTok, encounter a high volume of unverified, AI altered media. With internet
+subscriptions exceeding 40 million, TikTok has secured a 30.3% share of the local market. The 2025
+Reuters Institute Digital News Report indicates that while 38% of Kenyans turn to TikTok for news,
+55% of users acknowledge the platform as a primary channel for circulating deceptive and misleading
+content.
 
 ### Target User
 

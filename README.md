@@ -128,13 +128,13 @@ To protect vulnerable voters and civic activists from state surveillance, Hakiki
 
 ```mermaid
 graph TD
-  User[User (WhatsApp/SMS)] --> API[FastAPI Webhook]
-  API --> Privacy[Zero-PII Filter]
-  Privacy --> Media[Groq Whisper / HF ViT]
-  Privacy --> Extract[DeepSeek Claim Extraction]
+  User["User (WhatsApp/SMS)"] --> API["FastAPI Webhook"]
+  API --> Privacy["Zero-PII Filter"]
+  Privacy --> Media["Groq Whisper / HF ViT"]
+  Privacy --> Extract["DeepSeek Claim Extraction"]
   Media --> Match
-  Extract --> Match[Local DB / Google Fact Check]
-  Match --> Verdict[Symmetric Confidence Gating]
+  Extract --> Match["Local DB / Google Fact Check"]
+  Match --> Verdict["Symmetric Confidence Gating"]
   Verdict --> User
 ```
 

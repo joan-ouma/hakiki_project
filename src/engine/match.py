@@ -23,7 +23,7 @@ def match_claim(claim: str):
         }
         
     # 2. Check Google Fact Check API
-    google_api_key = os.getenv("GOOGLE_API_KEY")
+    google_api_key = os.getenv("GOOGLE_FACTCHECK_API_KEY")
     if google_api_key:
         try:
             url = f"https://factchecktools.googleapis.com/v1alpha1/claims:search?query={claim}&key={google_api_key}"

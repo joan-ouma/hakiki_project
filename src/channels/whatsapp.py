@@ -10,6 +10,7 @@ from src.engine.media import download_media, score_image, transcribe_audio
 from src.engine.links import extract_link, scrape_link_content
 from src.engine.verdict import compose_verdict
 from src.cache import check_cache, save_to_cache
+from src.privacy import hash_phone
 from src.config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
 
 router = APIRouter(prefix="/webhook")
@@ -77,6 +78,7 @@ async def whatsapp_webhook(
     background_tasks: BackgroundTasks = None,
 ):
     resp = MessagingResponse()
+    user_id = hash_phone(From)
 
     try:
         media_result = None

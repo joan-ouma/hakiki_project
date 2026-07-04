@@ -16,7 +16,8 @@ SMS_WELCOME = (
 )
 
 
-@router.post("/sms")
+@router.post("/sms", name="sms_webhook")
+@router.post("s/sms", name="sms_webhook_alt")
 async def sms_webhook(
     from_: str = Form("", alias="from"),
     to: str = Form(""),
@@ -70,11 +71,16 @@ def _send_sms(to: str, message: str):
     from src.config import AT_USERNAME, AT_API_KEY
 
     if not AT_USERNAME or not AT_API_KEY:
+        print(f"[AT SMS] Missing credentials: username={AT_USERNAME!r}")
         return
 
     africastalking.initialize(AT_USERNAME, AT_API_KEY)
     sms = africastalking.SMS
-    sms.send(message, [to])
+    try:
+        resp = sms.send(message, [to])
+        print(f"[AT SMS] Response: {resp}")
+    except Exception as e:
+        print(f"[AT SMS] Error: {e}")
 
 
 # --- USSD ---
@@ -126,25 +132,10 @@ async def ussd_webhook(
             return PlainTextResponse("END Sikupata madai yanayoweza kuthibitishwa. Jaribu tena na madai maalum.")
 
         matches = await asyncio.to_thread(match_claim, claim)
-        seed = matches.get("seed_match")
-        fc = matches.get("factcheck_match")
+        verdict = _sms_verdict(claim, matches)
+        _send_sms(phoneNumber, verdict)
 
-        if seed:
-            return PlainTextResponse(
-                f"END Madai: {claim[:60]}\n"
-                f"Rekodi: {seed['source']}\n"
-                f"Thibitisha: {seed.get('url', 'N/A')}"
-            )
-        elif fc:
-            return PlainTextResponse(
-                f"END Madai: {claim[:60]}\n"
-                f"Rating: {fc['rating']} - {fc['publisher']}"
-            )
-        else:
-            return PlainTextResponse(
-                f"END Madai: {claim[:60]}\n"
-                "HAIJATHIBITISHWA - Hakuna rekodi ya umma inayolingana."
-            )
+        return PlainTextResponse("END Tumeipokea. Angalia SMS yako kwa majibu kamili.")
 
     elif choice == "2":
         return PlainTextResponse(USSD_MENU["info"])

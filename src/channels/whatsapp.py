@@ -24,15 +24,20 @@ async def whatsapp_webhook(
 
     # Handle media (image) if attached
     media_result = None
-    if NumMedia > 0 and MediaUrl0 and MediaContentType0 and "image" in MediaContentType0:
-        media_bytes = await asyncio.to_thread(download_media, MediaUrl0)
-        cached = check_cache(media_bytes)
-        if cached:
-            media_result = cached
-        else:
-            media_result = await asyncio.to_thread(score_image, media_bytes)
-            if media_result and not media_result.get("error"):
-                save_to_cache(media_bytes, media_result)
+    if NumMedia > 0 and MediaUrl0:
+        is_image = MediaContentType0 and "image" in MediaContentType0
+        if is_image:
+            try:
+                media_bytes, ct = await asyncio.to_thread(download_media, MediaUrl0)
+                cached = check_cache(media_bytes)
+                if cached:
+                    media_result = cached
+                else:
+                    media_result = await asyncio.to_thread(score_image, media_bytes, ct)
+                    if media_result and not media_result.get("error"):
+                        save_to_cache(media_bytes, media_result)
+            except Exception as e:
+                media_result = {"error": f"Could not process image: {e}", "score": None}
 
     # Handle text claim
     claim = None

@@ -57,7 +57,7 @@ def compose_verdict(claim: str | None, matches: dict | None, media_result: dict 
 
         if seed or fc:
             source_for_summary = seed if seed else fc
-            source_type = "Public Government Record" if seed else "Fact-Check Organization"
+            source_type = "Public Government Record" if seed else "Hakiki Fact-Check"
             summary = _generate_summary(claim or "", source_for_summary or {}, source_type)
 
             if summary:
@@ -66,12 +66,21 @@ def compose_verdict(claim: str | None, matches: dict | None, media_result: dict 
 
             if seed and seed.get("url"):
                 parts.append(f"Thibitisha hapa: {seed['url']}")
-            if fc and fc.get("url"):
-                parts.append(f"Ripoti kamili: {fc['url']}")
+
+            if fc:
+                rating = fc.get("rating", "")
+                confidence = fc.get("confidence", 0)
+                explanation = fc.get("explanation", "")
+                source_hint = fc.get("source_hint", "")
+                parts.append(f"Tathmini: {rating} ({confidence}% uhakika)")
+                if explanation:
+                    parts.append(f"Sababu: {explanation}")
+                if source_hint:
+                    parts.append(f"Chanzo cha kuthibitisha: {source_hint}")
 
         else:
             parts.append("HAIJATHIBITISHWA")
-            parts.append("Hatukupata madai haya katika rekodi yoyote ya umma au database ya fact-check.")
+            parts.append("Hatukupata madai haya katika rekodi yoyote ya umma.")
             parts.append("")
             parts.append("Hii HAIMAANISHI ni uongo — inamaanisha hatuwezi kuthibitisha au kukanusha kwa sasa. Kuwa mwangalifu kabla ya kusambaza.")
 

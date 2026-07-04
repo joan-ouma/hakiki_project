@@ -25,21 +25,57 @@ def scrape_and_seed():
     url_to_scrape = "https://www.ngcdf.go.ke/" # This is a placeholder target
     
     try:
+        # We use a known public source discussing NG-CDF audit reports to get real context.
+        # Firecrawl will extract the markdown.
+        url_to_scrape = "https://www.tuko.co.ke/politics/493208-auditor-general-nancy-gathungu-exposes-sh-10b-ng-cdf-funds-unaccounted-for/"
+        
         print(f"Scraping data from {url_to_scrape}...")
-        scrape_result = app.scrape_url(url_to_scrape, params={'formats': ['markdown']})
+        scrape_result = app.scrape_url(url_to_scrape)
         
-        content = scrape_result.get('markdown', 'No markdown content extracted.')
+        # Firecrawl results might be a string, dict, or Document object
+        if isinstance(scrape_result, str):
+            content = scrape_result
+        elif isinstance(scrape_result, dict):
+            content = scrape_result.get('markdown', '') or scrape_result.get('content', '')
+        else:
+            # It's a Document object in newer SDKs
+            content = getattr(scrape_result, 'markdown', '') or getattr(scrape_result, 'content', '')
         
-        # In a real scenario, we'd parse specific projects from the markdown.
-        # Here we insert a sample representation of what the scrape extracts.
+        if not content:
+            print("Warning: Scrape returned empty content. No data seeded.")
+            return
+            
+        print("Scrape successful. Extracting real facts using DeepSeek...")
         
+        # Use DeepSeek to extract the core facts from the scraped article
+        deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not deepseek_api_key:
+            print("Warning: DEEPSEEK_API_KEY not found. Inserting raw markdown.")
+            fact_summary = content[:500] + "..."
+        else:
+            from openai import OpenAI
+            client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com", timeout=20.0)
+            prompt = f"""
+            Extract the main factual findings regarding the NG-CDF audit from the following scraped news article.
+            Format as a short, factual summary. Do not make up any information.
+            
+            Article: {content[:4000]}
+            """
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=200
+            )
+            fact_summary = response.choices[0].message.content.strip()
+            
         insert_seed_record(
-            source_type="ng-cdf",
-            title="Sample NG-CDF Allocation 2023",
-            content=f"Extracted snippet: {content[:200]}... Funding for 5 new secondary schools in Kibra constituency was approved at 50M KES.",
+            source_type="news-audit",
+            title="Auditor-General Findings on NG-CDF",
+            content=fact_summary,
             url=url_to_scrape
         )
-        print("Scrape and DB insertion completed successfully.")
+        print("Scrape and DB insertion completed successfully with real data!")
         
     except Exception as e:
         print(f"Error during scrape: {e}")

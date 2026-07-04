@@ -12,6 +12,6 @@ AT_USERNAME = os.getenv("AT_USERNAME", "")
 AT_API_KEY = os.getenv("AT_API_KEY", "")
 AT_SHORTCODE = os.getenv("AT_SHORTCODE", "")
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")

@@ -30,6 +30,21 @@ def sms_webhook(
     # To be safe and demo-ready without complex REST API outbound, we'll return PlainText.
     return PlainTextResponse(reply_text)
 
+async def _process_ussd_claim(user_claim: str, phone: str):
+    """Background: extract claim, match, send verdict via SMS."""
+    try:
+        claim = extract_claim(user_claim)
+        if not claim:
+            _send_sms(phone, "Hakiki: Sikupata madai yanayoweza kuthibitishwa. Jaribu madai maalum kuhusu serikali au siasa.")
+            return
+        matches = match_claim(claim)
+        verdict = _sms_verdict(claim, matches)
+        _send_sms(phone, verdict)
+    except Exception as e:
+        print(f"[USSD] Background error for {hash_phone(phone)}: {e}")
+        _send_sms(phone, "Hakiki: Samahani, huduma haipatikani kwa sasa. Jaribu tena baadaye.")
+
+
 @router.post("/ussd")
 def ussd_webhook(
     sessionId: str = Form(...),

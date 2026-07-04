@@ -6,15 +6,15 @@ from src.engine.verdict import compose_verdict
 @patch("src.engine.verdict._generate_summary", return_value="")
 def test_verdict_with_no_matches(mock_summary):
     result = compose_verdict("Ruto built a hospital", {"seed_match": None, "factcheck_match": None})
-    assert "HAIJATHIBITISHWA" in result
+    assert "UNVERIFIED" in result
     assert "Hakiki Bot" in result
 
 
-@patch("src.engine.verdict._generate_summary", return_value="Kulingana na NG-CDF, hakuna rekodi.")
+@patch("src.engine.verdict._generate_summary", return_value="According to NG-CDF records, no such project exists.")
 def test_verdict_with_seed_match(mock_summary):
     seed = {"source": "NG-CDF", "url": "https://ngcdf.go.ke/test", "constituency": "Changamwe", "project": "Test", "details": "Test"}
     result = compose_verdict("CDF Changamwe", {"seed_match": seed, "factcheck_match": None})
-    assert "Kulingana na NG-CDF" in result
+    assert "According to NG-CDF" in result
     assert "https://ngcdf.go.ke/test" in result
 
 
@@ -29,31 +29,31 @@ def test_verdict_with_factcheck(mock_summary):
 def test_verdict_with_media_high_ai():
     media = {"ai_probability": 0.9}
     result = compose_verdict(None, None, media_result=media)
-    assert "AI" in result
-    assert "Usisambaze" in result
+    assert "AI-generated" in result
+    assert "Do not share" in result
 
 
 def test_verdict_with_media_authentic():
     media = {"ai_probability": 0.1}
     result = compose_verdict(None, None, media_result=media)
-    assert "halisi" in result
+    assert "authentic" in result
 
 
 def test_verdict_with_media_inconclusive():
     media = {"ai_probability": 0.5}
     result = compose_verdict(None, None, media_result=media)
-    assert "uhakika" in result
+    assert "can't say for sure" in result
 
 
 def test_verdict_with_media_error():
     media = {"error": "Could not download"}
     result = compose_verdict(None, None, media_result=media)
-    assert "Hatukuweza" in result
+    assert "couldn't analyze" in result
 
 
 def test_verdict_with_transcription():
     result = compose_verdict("Test claim", {"seed_match": None, "factcheck_match": None}, transcription="nimesema hivi")
-    assert 'Nilisikia: "nimesema hivi"' in result
+    assert 'I heard: "nimesema hivi"' in result
 
 
 def test_verdict_never_exposes_model_name():

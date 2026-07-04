@@ -1,58 +1,97 @@
-def compose_verdict(claim: str | None, matches: dict | None, media_result: dict | None = None) -> str:
-    """Compose a sourced verdict reply from match results and/or media analysis."""
+from openai import OpenAI
+from src.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+
+_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+
+SUMMARY_PROMPT = """You are a Kenyan fact-check bot replying to a citizen on WhatsApp. Given a claim and the source data we found, write a brief, clear summary (3-4 sentences max) that:
+1. States what the claim says
+2. Explains what our records show (agreeing, contradicting, or partially related)
+3. Tells the user what to conclude
+
+Rules:
+- Write in simple English mixed with Swahili where natural (like a Kenyan would text)
+- Be direct — no hedging or academic language
+- If the source only partially matches (e.g. confirms the constituency exists but not the specific claim), say so clearly
+- Never fabricate information not in the source data
+- End with a clear recommendation: share, don't share, or verify further"""
+
+
+def _generate_summary(claim: str, source_data: dict, source_type: str) -> str:
+    """Use DeepSeek to generate a contextual summary from claim + source."""
+    context = f"Source type: {source_type}\n"
+    for k, v in source_data.items():
+        if v and k != "raw":
+            context += f"{k}: {v}\n"
+
+    try:
+        response = _client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": SUMMARY_PROMPT},
+                {"role": "user", "content": f"Claim: {claim}\n\nSource data:\n{context}"},
+            ],
+            max_tokens=200,
+            temperature=0.3,
+            timeout=10,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return ""
+
+
+def compose_verdict(claim: str | None, matches: dict | None, media_result: dict | None = None, transcription: str | None = None) -> str:
+    """Compose a user-friendly sourced verdict with AI-generated summary."""
     parts = []
 
-    if claim:
-        parts.append(f'Claim: "{claim}"\n')
+    if transcription:
+        parts.append(f'Nilisikia: "{transcription}"')
+        parts.append("")
 
-    # Claim matching results
+    if claim:
+        parts.append(f'Madai: "{claim}"')
+        parts.append("")
+
     if matches:
         seed = matches.get("seed_match")
         fc = matches.get("factcheck_match")
 
-        if seed:
-            parts.append("PUBLIC RECORD FOUND:")
-            parts.append(f"  Source: {seed['source']}")
-            if seed["constituency"]:
-                parts.append(f"  Constituency: {seed['constituency']}")
-            if seed["project"]:
-                parts.append(f"  Project: {seed['project']}")
-            if seed["details"]:
-                parts.append(f"  Details: {seed['details']}")
-            if seed["url"]:
-                parts.append(f"  Reference: {seed['url']}")
+        if seed or fc:
+            source_for_summary = seed if seed else fc
+            source_type = "Public Government Record" if seed else "Fact-Check Organization"
+            summary = _generate_summary(claim or "", source_for_summary or {}, source_type)
+
+            if summary:
+                parts.append(summary)
+                parts.append("")
+
+            if seed and seed.get("url"):
+                parts.append(f"Thibitisha hapa: {seed['url']}")
+            if fc and fc.get("url"):
+                parts.append(f"Ripoti kamili: {fc['url']}")
+
+        else:
+            parts.append("HAIJATHIBITISHWA")
+            parts.append("Hatukupata madai haya katika rekodi yoyote ya umma au database ya fact-check.")
             parts.append("")
+            parts.append("Hii HAIMAANISHI ni uongo — inamaanisha hatuwezi kuthibitisha au kukanusha kwa sasa. Kuwa mwangalifu kabla ya kusambaza.")
 
-        if fc:
-            parts.append("FACT-CHECK MATCH:")
-            parts.append(f"  Rating: {fc['rating']}")
-            parts.append(f"  By: {fc['publisher']}")
-            if fc["url"]:
-                parts.append(f"  Source: {fc['url']}")
-            parts.append("")
+        parts.append("")
 
-        if not seed and not fc:
-            parts.append(
-                "UNVERIFIED: No matching public record or fact-check found. "
-                "This claim could not be confirmed or denied from available sources.\n"
-            )
-
-    # Media analysis results
     if media_result:
         if media_result.get("error"):
-            parts.append("We couldn't analyze this image right now. Try again later.")
+            parts.append("Hatukuweza kuchunguza picha hii kwa sasa. Jaribu tena baadaye.")
         else:
             prob = media_result.get("ai_probability", 0)
             if prob > 0.7:
-                parts.append(f"This image appears to be AI-generated or manipulated ({prob:.0%} confidence).")
-                parts.append("Be cautious sharing it as evidence.")
+                parts.append(f"Picha hii inaonekana kutengenezwa na AI ({prob:.0%} uhakika).")
+                parts.append("Usisambaze kama ushahidi wa tukio halisi.")
             elif prob < 0.3:
-                parts.append(f"This image appears authentic ({1-prob:.0%} confidence).")
-                parts.append("No signs of AI manipulation detected.")
+                parts.append(f"Picha hii inaonekana ni halisi ({1-prob:.0%} uhakika).")
+                parts.append("Hakuna dalili za kuhaririwa na AI.")
             else:
-                parts.append(f"We can't tell if this image is real or AI-generated (confidence too low at {prob:.0%}).")
-                parts.append("Consider verifying with other sources before sharing.")
-            parts.append("")
+                parts.append("Hatuwezi kusema kwa uhakika kama picha hii ni halisi au ya AI.")
+                parts.append("Thibitisha na vyanzo vingine kabla ya kusambaza.")
+        parts.append("")
 
-    parts.append("-- Hakiki Bot (automated, not legal advice)")
+    parts.append("— Hakiki Bot | Forward ujumbe wowote wa kushuku ukaguliwe")
     return "\n".join(parts)

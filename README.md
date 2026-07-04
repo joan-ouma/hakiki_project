@@ -11,20 +11,25 @@
 |------|------|--------|
 | Addy Mutuiri| Backend Engineer | [@Addy](https://github.com/mutuiris) |
 | Joan Ouma| Full-Stack Developer | [@Joan](https://github.com/joan-ouma)
-|
+
 
 **Team Name:** T004
-**University:** [Insert University Name]
+**University:** Addy - Kenyatta University
+                Joan - Jomo Kenyatta University
+                
 
 ---
 
 ## Problem & User
 
 ### Problem Statement
+First time Generation Z voters aged 18 - 29 in Kenya, especially those who consume political
+narratives on TikTok, encounter a high volume of unverified, AI altered media. With internet
+subscriptions exceeding 40 million, TikTok has secured a 30.3% share of the local market. The 2025
+Reuters Institute Digital News Report indicates that while 38% of Kenyans turn to TikTok for news,
+55% of users acknowledge the platform as a primary channel for circulating deceptive and misleading
+content.
 
-<!-- Describe the core problem in 2-3 sentences. Keep it sharp. -->
-
-> [e.g. Rural citizens cannot track how county budgets are spent because audit reports are published as lengthy, technical English PDFs on desktop-optimised websites — a last-mile delivery and comprehension barrier for WhatsApp-reliant, vernacular-speaking populations.]
 
 ### Target User
 
@@ -123,6 +128,6 @@ Examples:
 
 ## License
 
-MIT © [Team Name], 2026
+MIT © T004, 2026
 
 ---

@@ -1,7 +1,6 @@
 import httpx
-from src.config import HF_API_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+from src.config import HF_API_TOKEN, GROQ_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
 
-# ponytail: using umm-maybe/AI-image-detector on HF Inference API
 # swap to local transformers if this model goes offline
 HF_MODEL = "umm-maybe/AI-image-detector"
 HF_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
@@ -53,3 +52,29 @@ def score_image(image_bytes: bytes, content_type: str = "image/jpeg") -> dict:
         }
 
     return {"error": "Unexpected response format", "score": None, "raw": results}
+
+
+GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+
+
+def transcribe_audio(audio_bytes: bytes, content_type: str = "audio/ogg") -> str | None:
+    """Transcribe audio via Groq Whisper API (fast, accurate, supports Swahili)."""
+    if not GROQ_API_KEY:
+        return None
+
+    ext = "ogg" if "ogg" in content_type else "mp3" if "mp3" in content_type else "wav"
+
+    try:
+        r = httpx.post(
+            GROQ_TRANSCRIPTION_URL,
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            files={"file": (f"audio.{ext}", audio_bytes, content_type)},
+            data={"model": "whisper-large-v3", "language": "sw"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return None
+
+    return data.get("text", "").strip() or None

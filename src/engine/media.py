@@ -4,22 +4,28 @@ from src.config import HF_API_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
 # ponytail: using umm-maybe/AI-image-detector on HF Inference API
 # swap to local transformers if this model goes offline
 HF_MODEL = "umm-maybe/AI-image-detector"
-HF_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+HF_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
 
 
-def download_media(media_url: str) -> bytes:
-    """Download media from Twilio (requires basic auth)."""
+def download_media(media_url: str) -> tuple[bytes, str]:
+    """Download media from Twilio — follow redirect to CDN. Returns (bytes, content_type)."""
     r = httpx.get(
         media_url,
         auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
-        follow_redirects=True,
+        follow_redirects=False,
         timeout=30,
     )
+    if r.status_code in (301, 302, 307, 308) and "location" in r.headers:
+        r = httpx.get(r.headers["location"], timeout=30)
+    elif r.status_code == 200:
+        return r.content, r.headers.get("content-type", "image/jpeg")
+    else:
+        r.raise_for_status()
     r.raise_for_status()
-    return r.content
+    return r.content, r.headers.get("content-type", "image/jpeg")
 
 
-def score_image(image_bytes: bytes) -> dict:
+def score_image(image_bytes: bytes, content_type: str = "image/jpeg") -> dict:
     """Score image for AI-generation/manipulation via HF Inference API."""
     if not HF_API_TOKEN:
         return {"error": "No HF_API_TOKEN configured", "score": None}
@@ -27,7 +33,7 @@ def score_image(image_bytes: bytes) -> dict:
     try:
         r = httpx.post(
             HF_URL,
-            headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
+            headers={"Authorization": f"Bearer {HF_API_TOKEN}", "Content-Type": content_type},
             content=image_bytes,
             timeout=30,
         )

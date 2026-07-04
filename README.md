@@ -33,12 +33,12 @@ First-time Generation Z and rural voters in Kenya face significant exposure to u
 
 ### The Specific Gap
 
-1. **What's already there:** The Auditor-General publishes detailed NG-CDF audit reports, and organizations track budget transparency.
-2. **Why it falls short:** These reports are 200+ page English PDFs hidden on government websites. They require desktop browsers, data bundles, and advanced literacy to parse.
-3. **The gap we fill:** Hakiki provides a real-time, zero-data-bundle (SMS/USSD) and rich-media (WhatsApp) chatbot. You forward a claim or video, and Hakiki extracts the facts using LLMs, checks them against a scraped database of real Auditor-General findings, and analyzes media for AI manipulation—all in seconds.
+1. **What's already there:** Civic tech organizations and fact-checkers rely on manual, centralized verification processes that require high digital literacy and active searching by the user.
+2. **Why it falls short:** Information is not being pushed to where it is needed—on WhatsApp and SMS—where the vast majority of Kenyan election misinformation currently spreads. Relying on users to go to a website to verify a claim is too high a barrier.
+3. **The gap we fill:** Hakiki meets voters where they are by providing a frictionless, WhatsApp-native verification chatbot. Users simply forward suspicious content, and Hakiki delivers an instant, localized verdict, bypassing the need for digital navigation and bridging the last-mile gap in information access.
 
 ### Why It Matters
-When citizens cannot verify claims about constituency spending, accountability dies. By bringing fact-checking directly to the chat apps Kenyans already use every day, we close the information gap, enabling voters to demand answers and participate effectively in the 2027 democratic process.
+By neutralizing deepfakes at the point of consumption, Hakiki stops the viral "information decay" that happens when fake content is shared unchecked in closed messaging groups. This restores the integrity of the information ecosystem, allowing voters to make choices based on facts rather than manufactured fabrications, and ensuring that marginalized and rural populations have the same access to truth as digitally savvy urbanites.
 
 ---
 

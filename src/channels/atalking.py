@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, BackgroundTasks, Form
 from fastapi.responses import PlainTextResponse
 
 from src.engine.claim import extract_claim
@@ -102,39 +102,44 @@ USSD_MENU = {
 }
 
 
+async def _process_ussd_claim(user_claim: str, phone: str):
+    """Background: extract claim, match, send verdict via SMS."""
+    try:
+        claim = extract_claim(user_claim)
+        if not claim:
+            _send_sms(phone, "Hakiki: Sikupata madai yanayoweza kuthibitishwa. Jaribu madai maalum kuhusu serikali au siasa.")
+            return
+        matches = match_claim(claim)
+        verdict = _sms_verdict(claim, matches)
+        _send_sms(phone, verdict)
+    except Exception as e:
+        print(f"[USSD] Background error for {hash_phone(phone)}: {e}")
+        _send_sms(phone, "Hakiki: Samahani, huduma haipatikani kwa sasa. Jaribu tena baadaye.")
+
+
 @router.post("/ussd")
 async def ussd_webhook(
     sessionId: str = Form(""),
     serviceCode: str = Form(""),
     phoneNumber: str = Form(""),
     text: str = Form(""),
+    background_tasks: BackgroundTasks = None,
 ):
     """Africa's Talking USSD callback. CON = continue session, END = close."""
     parts = text.split("*") if text else []
 
-    # Level 0: main menu
     if not text:
         return PlainTextResponse(USSD_MENU["start"])
 
-    # Level 1: user selected option
     choice = parts[0]
 
     if choice == "1":
         if len(parts) == 1:
             return PlainTextResponse("CON Andika madai unayotaka kuangalia:")
 
-        # Level 2: user typed their claim
         user_claim = "*".join(parts[1:])
-        claim = await asyncio.to_thread(extract_claim, user_claim)
-
-        if not claim:
-            return PlainTextResponse("END Sikupata madai yanayoweza kuthibitishwa. Jaribu tena na madai maalum.")
-
-        matches = await asyncio.to_thread(match_claim, claim)
-        verdict = _sms_verdict(claim, matches)
-        _send_sms(phoneNumber, verdict)
-
-        return PlainTextResponse("END Tumeipokea. Angalia SMS yako kwa majibu kamili.")
+        background_tasks.add_task(_process_ussd_claim, user_claim, phoneNumber)
+        return PlainTextResponse("END Tumeipokea. Utapata majibu kwa SMS hivi karibuni.")
 
     elif choice == "2":
         return PlainTextResponse(USSD_MENU["info"])

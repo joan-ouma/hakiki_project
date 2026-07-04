@@ -1,74 +1,45 @@
-import sqlite3
-import httpx
-from src.store import DB_PATH
-from src.config import GOOGLE_FACTCHECK_API_KEY
+import os
+import requests
+from src.store import search_seed_records
 
-
-def match_seed_db(claim: str) -> dict | None:
-    """Simple keyword match against seed records."""
-    db = sqlite3.connect(str(DB_PATH))
-    db.row_factory = sqlite3.Row
-    import re
-    words = [w for w in re.findall(r'[a-z]+', claim.lower()) if len(w) > 3]
-    if not words:
-        db.close()
+def match_claim(claim: str):
+    """
+    Matches an extracted claim against local SQLite data and Google Fact Check API.
+    Returns the best matching source or None if unverified.
+    """
+    if not claim or claim == "NO CLAIM FOUND" or claim == "ERROR_EXTRACTING_CLAIM":
         return None
-
-    # ponytail: OR-based LIKE search, upgrade to FTS5 if this gets slow
-    conditions = " OR ".join(["(LOWER(project) LIKE ? OR LOWER(details) LIKE ? OR LOWER(constituency) LIKE ?)"] * len(words))
-    params = []
-    for w in words:
-        params.extend([f"%{w}%"] * 3)
-
-    row = db.execute(
-        f"SELECT * FROM seed_records WHERE {conditions} LIMIT 1", params
-    ).fetchone()
-    db.close()
-
-    if row:
+        
+    # 1. Check local seed database
+    db_results = search_seed_records(claim)
+    if db_results:
+        # For MVP, just return the first hit
+        best_match = db_results[0]
         return {
-            "source": row["source"],
-            "constituency": row["constituency"],
-            "project": row["project"],
-            "details": row["details"],
-            "url": row["url"],
+            "source_type": "local_db",
+            "title": best_match["title"],
+            "url": best_match["url"],
+            "content_snippet": best_match["content"]
         }
+        
+    # 2. Check Google Fact Check API
+    google_api_key = os.getenv("GOOGLE_FACTCHECK_API_KEY")
+    if google_api_key:
+        try:
+            url = f"https://factchecktools.googleapis.com/v1alpha1/claims:search?query={claim}&key={google_api_key}"
+            response = requests.get(url, timeout=5)
+            data = response.json()
+            
+            if "claims" in data and len(data["claims"]) > 0:
+                best_claim = data["claims"][0]
+                review = best_claim.get("claimReview", [{}])[0]
+                return {
+                    "source_type": "google_fact_check",
+                    "title": review.get("title", best_claim.get("text")),
+                    "url": review.get("url"),
+                    "content_snippet": review.get("textualRating", "No rating found")
+                }
+        except Exception as e:
+            print(f"Google Fact Check API error: {e}")
+            
     return None
-
-
-def match_factcheck_api(claim: str) -> dict | None:
-    """Query Google Fact Check Tools API."""
-    if not GOOGLE_FACTCHECK_API_KEY:
-        return None
-
-    try:
-        r = httpx.get(
-            "https://factchecktools.googleapis.com/v1alpha1/claims:search",
-            params={"query": claim, "key": GOOGLE_FACTCHECK_API_KEY, "languageCode": "en"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except (httpx.HTTPError, Exception):
-        return None
-
-    claims = data.get("claims", [])
-    if not claims:
-        return None
-
-    top = claims[0]
-    review = top.get("claimReview", [{}])[0]
-    return {
-        "claim_text": top.get("text", ""),
-        "claimant": top.get("claimant", "Unknown"),
-        "rating": review.get("textualRating", "Unknown"),
-        "publisher": review.get("publisher", {}).get("name", "Unknown"),
-        "url": review.get("url", ""),
-    }
-
-
-def match_claim(claim: str) -> dict:
-    """Try seed DB first, then Google Fact Check API as fallback."""
-    seed = match_seed_db(claim)
-    factcheck = match_factcheck_api(claim)
-    return {"seed_match": seed, "factcheck_match": factcheck}

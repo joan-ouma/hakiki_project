@@ -1,18 +1,12 @@
 from fastapi import FastAPI
-from src.channels.whatsapp import router as whatsapp_router
-from src.channels.atalking import router as at_router
-from src.store import init_db
+from src.channels import whatsapp, atalking
 
-app = FastAPI(title="Hakiki", version="0.1.0")
-app.include_router(whatsapp_router)
-app.include_router(at_router)
+app = FastAPI(title="Hakiki Backend")
 
+# Include routers
+app.include_router(whatsapp.router, prefix="/whatsapp", tags=["WhatsApp"])
+app.include_router(atalking.router, prefix="/at", tags=["AfricasTalking"])
 
-@app.on_event("startup")
-def startup():
-    init_db()
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "Hakiki Backend is running."}

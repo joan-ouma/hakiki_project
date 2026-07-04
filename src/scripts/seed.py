@@ -44,6 +44,16 @@ SOURCES = {
         "https://www.treasury.go.ke/budget/",
         "https://www.opendata.go.ke/datasets/",
     ],
+    "Finance-Bill": [
+        "https://www.parliament.go.ke/the-national-assembly/house-business/bills",
+        "https://www.treasury.go.ke/tax-policy/",
+    ],
+    "Parliament": [
+        "https://www.parliament.go.ke/the-national-assembly/house-business/hansard",
+    ],
+    "Health": [
+        "https://www.health.go.ke/",
+    ],
     "IEBC": [
         "https://www.iebc.or.ke/registration/",
     ],
@@ -228,10 +238,89 @@ def parse_iebc(content: str, url: str) -> list[dict]:
     return records
 
 
+def parse_finance_bill(content: str, url: str) -> list[dict]:
+    """Extract finance bill provisions and tax changes."""
+    records = []
+    keywords = ["tax", "vat", "excise", "levy", "duty", "income tax", "finance bill",
+                "amendment", "repeal", "propose", "impose", "exempt", "rate",
+                "housing levy", "shif", "nssf", "paye"]
+    lines = content.split("\n")
+
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 30 or len(line) > 500:
+            continue
+        if any(skip in line.lower() for skip in ["menu", "nav", "footer", "cookie"]):
+            continue
+        if any(kw in line.lower() for kw in keywords):
+            records.append({
+                "source": "Finance Bill",
+                "constituency": "",
+                "project": line[:200],
+                "details": line,
+                "url": url,
+            })
+
+    return records
+
+
+def parse_parliament(content: str, url: str) -> list[dict]:
+    """Extract parliamentary hansard mentions."""
+    records = []
+    keywords = ["motion", "bill", "debate", "vote", "resolution", "committee",
+                "mp ", "hon.", "speaker", "petition", "amendment"]
+    lines = content.split("\n")
+
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 30 or len(line) > 500:
+            continue
+        if any(skip in line.lower() for skip in ["menu", "nav", "footer", "cookie"]):
+            continue
+        if any(kw in line.lower() for kw in keywords):
+            records.append({
+                "source": "Parliament Hansard",
+                "constituency": "",
+                "project": line[:200],
+                "details": line,
+                "url": url,
+            })
+
+    return records
+
+
+def parse_health(content: str, url: str) -> list[dict]:
+    """Extract health ministry data."""
+    records = []
+    keywords = ["hospital", "health", "uhc", "sha", "nhif", "clinic", "vaccine",
+                "doctor", "nurse", "medical", "facility", "patient"]
+    lines = content.split("\n")
+
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 30 or len(line) > 500:
+            continue
+        if any(skip in line.lower() for skip in ["menu", "nav", "footer", "cookie"]):
+            continue
+        if any(kw in line.lower() for kw in keywords):
+            records.append({
+                "source": "Ministry of Health",
+                "constituency": "",
+                "project": line[:200],
+                "details": line,
+                "url": url,
+            })
+
+    return records
+
+
 PARSERS = {
     "NG-CDF": parse_ngcdf,
     "Auditor-General": parse_auditor_general,
     "Budget": parse_budget,
+    "Finance-Bill": parse_finance_bill,
+    "Parliament": parse_parliament,
+    "Health": parse_health,
     "IEBC": parse_iebc,
     "News-Nation": lambda c, u: parse_news(c, u, "Daily Nation"),
     "News-Standard": lambda c, u: parse_news(c, u, "The Standard"),
@@ -265,25 +354,76 @@ def load_to_db(records: list[dict]):
     db.close()
 
 
-def main():
-    if not FIRECRAWL_API_KEY:
-        print("[ERROR] No FIRECRAWL_API_KEY set in .env")
-        return
+DOCS_DIR = Path(__file__).parent.parent.parent / "data"
 
-    app = Firecrawl(api_key=FIRECRAWL_API_KEY)
+
+def load_pdfs() -> list[dict]:
+    """Load PDF files from data/docs/ using PyPDF2 and parse into records."""
+    records = []
+    if not DOCS_DIR.exists():
+        return records
+
+    try:
+        import PyPDF2
+    except ImportError:
+        print("[PDF] PyPDF2 not installed, skipping PDF loading. Run: pip install PyPDF2")
+        return records
+
+    for pdf_path in DOCS_DIR.glob("*.pdf"):
+        print(f"[PDF] Loading: {pdf_path.name}")
+        try:
+            reader = PyPDF2.PdfReader(str(pdf_path))
+            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+            # Derive source from filename (e.g. "finance_bill_2024.pdf" -> "Finance Bill 2024")
+            source = pdf_path.stem.replace("_", " ").replace("-", " ").title()
+
+            lines = text.split("\n")
+            for line in lines:
+                line = line.strip()
+                if not line or len(line) < 30 or len(line) > 500:
+                    continue
+                # Skip obvious junk
+                if any(skip in line.lower() for skip in ["page ", "table of contents", "....."]):
+                    continue
+                records.append({
+                    "source": source,
+                    "constituency": "",
+                    "project": line[:200],
+                    "details": line,
+                    "url": f"file://{pdf_path.name}",
+                })
+            print(f"  -> {len([r for r in records if r['url'].endswith(pdf_path.name)])} lines from {pdf_path.name}")
+        except Exception as e:
+            print(f"  -> ERROR: {e}")
+
+    return records
+
+
+def main():
     all_records = []
 
-    for label, urls in SOURCES.items():
-        parser = PARSERS.get(label)
-        if not parser:
-            continue
+    # Load PDFs first (no API key needed)
+    pdf_records = load_pdfs()
+    all_records.extend(pdf_records)
 
-        for url in urls:
-            page = scrape_url(app, url, label)
-            if page:
-                records = parser(page["content"], page["url"])
-                all_records.extend(records)
-                print(f"  -> parsed {len(records)} records")
+    # Scrape web sources if Firecrawl key available
+    if FIRECRAWL_API_KEY:
+        app = Firecrawl(api_key=FIRECRAWL_API_KEY)
+
+        for label, urls in SOURCES.items():
+            parser = PARSERS.get(label)
+            if not parser:
+                continue
+
+            for url in urls:
+                page = scrape_url(app, url, label)
+                if page:
+                    records = parser(page["content"], page["url"])
+                    all_records.extend(records)
+                    print(f"  -> parsed {len(records)} records")
+    else:
+        print("[WARN] No FIRECRAWL_API_KEY — skipping web scraping, using PDFs only")
 
     # Deduplicate by (source, project)
     seen = set()
@@ -295,7 +435,7 @@ def main():
             deduped.append(r)
 
     if not deduped:
-        print("[WARN] No records scraped. Check FIRECRAWL_API_KEY and source URLs.")
+        print("[WARN] No records found. Add PDFs to data/docs/ or set FIRECRAWL_API_KEY.")
         return
 
     load_to_db(deduped)

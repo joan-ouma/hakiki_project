@@ -133,6 +133,28 @@ graph TD
   Verdict --> User
 ```
 
+*(Alternatively, view our comprehensive visual architecture below:)*  
+![End-to-End Architecture](static/architecture.png)
+
+---
+
+## 📅 Project Roadmap: Built Today vs. Future
+
+### What We Built Today (Phase 1 & 2)
+1. **Core Verification Engine:** The fully functional backend (FastAPI) capable of routing WhatsApp and SMS requests.
+2. **Zero-PII Gateway:** Hardened privacy filter (`privacy.py`) that strictly scrubs personal data before any AI processing.
+3. **AI Inference Pipeline:** 
+   - DeepSeek for rapid text claim extraction.
+   - Groq API (`whisper-large-v3`) for ultra-fast audio transcription.
+   - Local Hugging Face ViT (`dima806`) for visual deepfake detection.
+4. **Automated Fact Seeding:** Firecrawl script (`scripts/seed.py`) securely pulling live Auditor-General NG-CDF reports.
+5. **Local HashDB:** SQLite database functioning as our low-latency truth cache.
+
+### What We Will Build Next (Phase 3 & Beyond)
+1. **Vernacular Radio Ingestion (Radio Input):** Expanding our ingestion layer to continuously monitor vulnerable local vernacular radio broadcasts and automatically flag synthesized audio manipulation in real-time.
+2. **Analytics & Reporting Dashboard:** A secure, web-based UI for civil society organizations and journalists to visualize localized misinformation trends, track viral deepfakes by region, and measure the impact of fact-checking interventions.
+3. **WhatsApp Group Demo Automation:** An automated Twilio script to instantly create test groups and invite hackathon judges/voters for bulk demonstration.
+
 ---
 
 ## License

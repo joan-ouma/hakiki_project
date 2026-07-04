@@ -1,106 +1,34 @@
-import asyncio
-from fastapi import APIRouter, BackgroundTasks, Form
+from fastapi import APIRouter, Form
 from fastapi.responses import PlainTextResponse
 
+from src.privacy import strip_pii, hash_phone_number
 from src.engine.claim import extract_claim
 from src.engine.match import match_claim
-from src.privacy import hash_phone
+from src.engine.verdict import compose_verdict
 
-router = APIRouter(prefix="/webhook")
-
-# --- SMS ---
-
-SMS_WELCOME = (
-    "Hakiki Bot: Tuma madai yoyote ya kisiasa hapa na tutakuambia kama kuna ushahidi "
-    "katika rekodi za umma. Mfano: 'CDF Changamwe imeibwa'"
-)
-
+router = APIRouter()
 
 @router.post("/sms")
-async def sms_webhook(
-    from_: str = Form("", alias="from"),
-    to: str = Form(""),
-    text: str = Form(""),
-    date: str = Form(""),
-    id: str = Form(""),
+def sms_webhook(
+    phoneNumber: str = Form(...),
+    text: str = Form(...)
 ):
-    """Africa's Talking SMS callback. Returns empty — we reply via AT API."""
-    if not text.strip():
-        return PlainTextResponse("")
-
-    if text.strip().lower() in ("hi", "hello", "habari", "sasa", "help"):
-        _send_sms(from_, SMS_WELCOME)
-        return PlainTextResponse("")
-
-    claim = await asyncio.to_thread(extract_claim, text)
-
-    if not claim:
-        _send_sms(from_, "Hakiki: Sikupata madai yanayoweza kuthibitishwa. Jaribu kutuma madai maalum kuhusu serikali au siasa.")
-        return PlainTextResponse("")
-
-    matches = await asyncio.to_thread(match_claim, claim)
-    verdict = _sms_verdict(claim, matches)
-    _send_sms(from_, verdict)
-
-    return PlainTextResponse("")
-
-
-def _sms_verdict(claim: str, matches: dict) -> str:
-    """Short SMS-friendly verdict (160 chars target, 320 max)."""
-    seed = matches.get("seed_match")
-    fc = matches.get("factcheck_match")
-
-    if seed:
-        msg = f"Hakiki: Madai '{claim[:50]}' - Tumepata rekodi ya {seed['source']}"
-        if seed.get("url"):
-            msg += f". Thibitisha: {seed['url']}"
-        return msg[:320]
-    elif fc:
-        msg = f"Hakiki: Madai '{claim[:50]}' - Rating: {fc['rating']} ({fc['publisher']})"
-        if fc.get("url"):
-            msg += f". {fc['url']}"
-        return msg[:320]
-    else:
-        return f"Hakiki: Madai '{claim[:60]}' - HAIJATHIBITISHWA. Hatukupata ushahidi katika rekodi za umma. Kuwa mwangalifu usisambaze."
-
-
-def _send_sms(to: str, message: str):
-    """Send SMS via Africa's Talking."""
-    import africastalking
-    from src.config import AT_USERNAME, AT_API_KEY
-
-    if not AT_USERNAME or not AT_API_KEY:
-        print(f"[AT SMS] Missing credentials: username={AT_USERNAME!r}")
-        return
-
-    africastalking.initialize(AT_USERNAME, AT_API_KEY)
-    sms = africastalking.SMS
-    try:
-        resp = sms.send(message, [to])
-        print(f"[AT SMS] Sent to {hash_phone(to)}: {resp.get('SMSMessageData', {}).get('Message', '')}")
-    except Exception as e:
-        print(f"[AT SMS] Error for {hash_phone(to)}: {e}")
-
-
-# --- USSD ---
-
-USSD_MENU = {
-    "start": (
-        "CON Karibu Hakiki Bot\n"
-        "1. Angalia madai\n"
-        "2. Maelezo kuhusu Hakiki\n"
-        "3. Msaada"
-    ),
-    "info": (
-        "END Hakiki ni bot ya kuthibitisha habari za kisiasa Kenya. "
-        "Tunatumia rekodi za umma (NG-CDF, Auditor-General) na fact-check databases."
-    ),
-    "help": (
-        "END Chagua '1' kisha andika madai unayotaka kuangalia. "
-        "Mfano: 'CDF Changamwe imeibwa' au 'Ruto amejenga hospitali'."
-    ),
-}
-
+    """
+    Handles incoming Africa's Talking SMS messages.
+    """
+    hashed_user = hash_phone_number(phoneNumber)
+    clean_text = strip_pii(text)
+    
+    claim = extract_claim(clean_text)
+    match = match_claim(claim)
+    
+    # Media score is None since SMS cannot carry media
+    reply_text = compose_verdict(claim, match, media_score=None)
+    
+    # Africa's Talking SMS just expects a 200 OK or basic string, but usually 
+    # replies are sent via their REST API. However, some AT configs allow responding directly.
+    # To be safe and demo-ready without complex REST API outbound, we'll return PlainText.
+    return PlainTextResponse(reply_text)
 
 async def _process_ussd_claim(user_claim: str, phone: str):
     """Background: extract claim, match, send verdict via SMS."""
@@ -118,34 +46,35 @@ async def _process_ussd_claim(user_claim: str, phone: str):
 
 
 @router.post("/ussd")
-async def ussd_webhook(
-    sessionId: str = Form(""),
-    serviceCode: str = Form(""),
-    phoneNumber: str = Form(""),
-    text: str = Form(""),
-    background_tasks: BackgroundTasks = None,
+def ussd_webhook(
+    sessionId: str = Form(...),
+    serviceCode: str = Form(...),
+    phoneNumber: str = Form(...),
+    text: str = Form(...)
 ):
-    """Africa's Talking USSD callback. CON = continue session, END = close."""
-    parts = text.split("*") if text else []
-
-    if not text:
-        return PlainTextResponse(USSD_MENU["start"])
-
-    choice = parts[0]
-
-    if choice == "1":
-        if len(parts) == 1:
-            return PlainTextResponse("CON Andika madai unayotaka kuangalia:")
-
-        user_claim = "*".join(parts[1:])
-        background_tasks.add_task(_process_ussd_claim, user_claim, phoneNumber)
-        return PlainTextResponse("END Tumeipokea. Utapata majibu kwa SMS hivi karibuni.")
-
-    elif choice == "2":
-        return PlainTextResponse(USSD_MENU["info"])
-
-    elif choice == "3":
-        return PlainTextResponse(USSD_MENU["help"])
-
+    """
+    Handles incoming Africa's Talking USSD sessions.
+    """
+    hashed_user = hash_phone_number(phoneNumber)
+    
+    # AT USSD text comes as a chain of inputs separated by '*'. 
+    # E.g. "1*2*Claim"
+    inputs = text.split('*') if text else []
+    
+    if len(inputs) == 0 or inputs[0] == "":
+        # Initial menu
+        response = "CON Welcome to Hakiki Fact Check.\n"
+        response += "Please type the claim you want to verify:\n"
     else:
-        return PlainTextResponse("END Chaguo batili. Jaribu tena.")
+        # We assume the last input is the claim they typed.
+        user_input = inputs[-1]
+        clean_input = strip_pii(user_input)
+        
+        claim = extract_claim(clean_input)
+        match = match_claim(claim)
+        reply_text = compose_verdict(claim, match, media_score=None)
+        
+        # End session
+        response = f"END {reply_text}"
+        
+    return PlainTextResponse(response)

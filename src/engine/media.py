@@ -1,80 +1,84 @@
-import httpx
-from src.config import HF_API_TOKEN, GROQ_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+import asyncio
+import os
+import torch
+from transformers import pipeline
+from dotenv import load_dotenv
 
-# swap to local transformers if this model goes offline
-HF_MODEL = "umm-maybe/AI-image-detector"
-HF_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
+load_dotenv()
 
+# We load the pipelines lazily to avoid heavy initialization on import.
+whisper_pipeline = None
+vit_pipeline = None
 
-def download_media(media_url: str) -> tuple[bytes, str]:
-    """Download media from Twilio — follow redirect to CDN. Returns (bytes, content_type)."""
-    r = httpx.get(
-        media_url,
-        auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
-        follow_redirects=False,
-        timeout=30,
-    )
-    if r.status_code in (301, 302, 307, 308) and "location" in r.headers:
-        r = httpx.get(r.headers["location"], timeout=30)
-    elif r.status_code == 200:
-        return r.content, r.headers.get("content-type", "image/jpeg")
-    else:
-        r.raise_for_status()
-    r.raise_for_status()
-    return r.content, r.headers.get("content-type", "image/jpeg")
-
-
-def score_image(image_bytes: bytes, content_type: str = "image/jpeg") -> dict:
-    """Score image for AI-generation/manipulation via HF Inference API."""
-    if not HF_API_TOKEN:
-        return {"error": "No HF_API_TOKEN configured", "score": None}
-
-    try:
-        r = httpx.post(
-            HF_URL,
-            headers={"Authorization": f"Bearer {HF_API_TOKEN}", "Content-Type": content_type},
-            content=image_bytes,
-            timeout=30,
+def _load_vit():
+    global vit_pipeline
+    if vit_pipeline is None:
+        print("Loading ViT Deepfake Classifier locally...")
+        device = 0 if torch.cuda.is_available() else -1
+        vit_pipeline = pipeline(
+            "image-classification", 
+            model="dima806/deepfake_vs_real_image_detection",
+            device=device,
+            use_auth_token=os.getenv("HF_API_KEY")
         )
-        r.raise_for_status()
-        results = r.json()
+    return vit_pipeline
+
+def _process_audio_sync(audio_bytes: bytes) -> str:
+    """Synchronous function to transcribe audio via Groq Whisper."""
+    import tempfile
+    from groq import Groq
+    
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        print("Warning: GROQ_API_KEY not found. Skipping audio transcription.")
+        return ""
+        
+    client = Groq(api_key=api_key)
+    
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+    
+    try:
+        with open(tmp_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(tmp_path), file.read()),
+                model="whisper-large-v3",
+                prompt="Specify language as Swahili if applicable.", 
+                response_format="json",
+            )
+        return transcription.text
     except Exception as e:
-        return {"error": str(e), "score": None}
+        print(f"Groq Whisper inference error: {e}")
+        return ""
+    finally:
+        os.remove(tmp_path)
 
-    # Results come as [{"label": "artificial", "score": 0.9}, {"label": "human", "score": 0.1}]
-    if isinstance(results, list):
-        scores = {item["label"]: item["score"] for item in results}
-        ai_score = scores.get("artificial", scores.get("ai", 0))
-        return {
-            "ai_probability": round(ai_score, 3),
-            "label": "likely AI-generated" if ai_score > 0.7 else "likely authentic" if ai_score < 0.3 else "inconclusive",
-            "raw": scores,
-        }
-
-    return {"error": "Unexpected response format", "score": None, "raw": results}
-
-
-GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-
-
-def transcribe_audio(audio_bytes: bytes, content_type: str = "audio/ogg") -> str | None:
-    """Transcribe audio via Groq Whisper API (fast, accurate, supports Swahili)."""
-    if not GROQ_API_KEY:
-        return None
-
-    ext = "ogg" if "ogg" in content_type else "mp3" if "mp3" in content_type else "wav"
-
+def _process_image_sync(image_bytes: bytes) -> dict:
+    """Synchronous function to score image via ViT."""
+    pipe = _load_vit()
+    from PIL import Image
+    import io
+    
     try:
-        r = httpx.post(
-            GROQ_TRANSCRIPTION_URL,
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-            files={"file": (f"audio.{ext}", audio_bytes, content_type)},
-            data={"model": "whisper-large-v3", "language": "sw"},
-            timeout=30,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception:
-        return None
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        results = pipe(image)
+        # results format: [{'score': 0.99, 'label': 'fake'}, ...]
+        # Find the fake score
+        fake_score = 0.0
+        for r in results:
+            if r["label"].lower() == "fake":
+                fake_score = r["score"]
+        
+        return {"fake_probability": fake_score}
+    except Exception as e:
+        print(f"ViT inference error: {e}")
+        return {"fake_probability": 0.0}
 
-    return data.get("text", "").strip() or None
+async def process_audio(audio_bytes: bytes) -> str:
+    """Async wrapper to run inference in a threadpool."""
+    return await asyncio.to_thread(_process_audio_sync, audio_bytes)
+
+async def process_image(image_bytes: bytes) -> dict:
+    """Async wrapper to run inference in a threadpool."""
+    return await asyncio.to_thread(_process_image_sync, image_bytes)

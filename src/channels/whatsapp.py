@@ -4,6 +4,8 @@ from fastapi.responses import Response
 from twilio.twiml.messaging_response import MessagingResponse
 
 from src.engine.claim import extract_claim
+from src.engine.match import match_claim
+from src.engine.verdict import compose_verdict
 
 router = APIRouter(prefix="/webhook")
 
@@ -29,10 +31,10 @@ async def whatsapp_webhook(
             "I couldn't find a checkable factual claim in that message. "
             "Try forwarding a specific claim about a politician, project, or budget."
         )
-    else:
-        resp.message(
-            f"Claim detected:\n\"{claim}\"\n\n"
-            "Verification engine coming soon. Source matching not yet wired."
-        )
+        return Response(content=str(resp), media_type="text/xml")
+
+    matches = await asyncio.to_thread(match_claim, claim)
+    verdict = compose_verdict(claim, matches)
+    resp.message(verdict)
 
     return Response(content=str(resp), media_type="text/xml")

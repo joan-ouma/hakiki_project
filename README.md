@@ -33,12 +33,12 @@ First-time Generation Z and rural voters in Kenya face significant exposure to u
 
 ### The Specific Gap
 
-1. **What's already there:** Civic tech organizations and fact-checkers rely on manual, centralized verification processes that require high digital literacy and active searching by the user.
-2. **Why it falls short:** Information is not being pushed to where it is needed—on WhatsApp and SMS—where the vast majority of Kenyan election misinformation currently spreads. Relying on users to go to a website to verify a claim is too high a barrier.
-3. **The gap we fill:** Hakiki meets voters where they are by providing a frictionless, WhatsApp-native verification chatbot. Users simply forward suspicious content, and Hakiki delivers an instant, localized verdict, bypassing the need for digital navigation and bridging the last-mile gap in information access.
+1. **What's already there:** THRAETS, a pro-democracy civic tech organization, built "Community Fakes," a crowdsourcing platform addressing the gap in Western AI detection tools by relying on local human intelligence to spot regional deepfakes. They also developed "Spot the Fakes," a gamified quiz to train users.
+2. **Why it falls short:** However, a significant gap remains regarding digital literacy and connectivity. These digital only tools require stable bandwidth, inadvertently excluding rural and offline populations who rely heavily on vulnerable vernacular radio broadcasts, creating a massive last mile delivery challenge for isolated voters.
+3. **The gap we fill:** Hakiki provides a lightweight, WhatsApp-native and SMS/USSD verification chatbot. You forward a claim or video directly in the chat, and Hakiki uses a localized AI model to analyze the media in Kenyan dialects—intercepting deepfakes at the exact moment they are encountered, before the user decides to re-share.
 
 ### Why It Matters
-By neutralizing deepfakes at the point of consumption, Hakiki stops the viral "information decay" that happens when fake content is shared unchecked in closed messaging groups. This restores the integrity of the information ecosystem, allowing voters to make choices based on facts rather than manufactured fabrications, and ensuring that marginalized and rural populations have the same access to truth as digitally savvy urbanites.
+When election deepfakes and synthetic political content spread rapidly because voters can't easily spot them, the accountability loop breaks. By instantly intercepting and flagging synthetic media at the point of sharing, Hakiki prevents the viral spread of manufactured doubt and actively protects the democratic participation of marginalized voters.
 
 ---
 

@@ -78,7 +78,7 @@ async def whatsapp_webhook(
     background_tasks: BackgroundTasks = None,
 ):
     resp = MessagingResponse()
-    user_id = hash_phone(From)
+    print(f"[WA] Request from {hash_phone(From)}: media={NumMedia}, body_len={len(Body)}")
 
     try:
         media_result = None
@@ -90,7 +90,11 @@ async def whatsapp_webhook(
             return Response(content=str(resp), media_type="text/xml")
 
         if NumMedia > 0 and MediaUrl0 and MediaContentType0:
-            media_bytes, ct = await asyncio.to_thread(download_media, MediaUrl0)
+            try:
+                media_bytes, ct = await asyncio.to_thread(download_media, MediaUrl0)
+            except Exception:
+                resp.message("Hatukuweza kupakua faili yako. Tafadhali jaribu kutuma tena.")
+                return Response(content=str(resp), media_type="text/xml")
 
             if is_voice:
                 background_tasks.add_task(_process_voice, media_bytes, ct, From)
@@ -107,8 +111,6 @@ async def whatsapp_webhook(
                         save_to_cache(media_bytes, media_result)
 
             elif "video" in MediaContentType0:
-                # Video shared (e.g. from TikTok) — can't analyze video yet
-                # If there's caption text in Body, it'll be processed below
                 if not Body.strip():
                     resp.message(
                         "Nimepokea video yako. Kwa sasa siwezi kuchunguza video moja kwa moja.\n\n"
@@ -124,26 +126,36 @@ async def whatsapp_webhook(
         if text_input:
             link = extract_link(text_input)
             if link:
-                scraped = await asyncio.to_thread(scrape_link_content, link)
+                try:
+                    scraped = await asyncio.to_thread(scrape_link_content, link)
+                except Exception:
+                    scraped = None
+
                 if scraped:
                     text_input = scraped
                 else:
-                    # Couldn't scrape — strip the URL and use remaining text
                     remaining = text_input.replace(link, "").strip()
                     if remaining:
                         text_input = remaining
                     else:
-                        # Only a link, nothing else — ask user for context
                         resp.message(
-                            "Nimepokea link lakini siwezi kuisoma moja kwa moja. "
+                            "Nimepokea link lakini siwezi kuisoma kwa sasa. "
                             "Tafadhali copy-paste maneno/caption ya video hiyo hapa, "
                             "ama eleza madai yaliyomo kwa maneno yako."
                         )
                         return Response(content=str(resp), media_type="text/xml")
 
-            claim = await asyncio.to_thread(extract_claim, text_input)
+            try:
+                claim = await asyncio.to_thread(extract_claim, text_input)
+            except Exception:
+                resp.message("Huduma ya uchambuzi haipatikani kwa sasa. Tafadhali jaribu tena baadaye.")
+                return Response(content=str(resp), media_type="text/xml")
+
             if claim:
-                matches = await asyncio.to_thread(match_claim, claim)
+                try:
+                    matches = await asyncio.to_thread(match_claim, claim)
+                except Exception:
+                    matches = {"seed_match": None, "factcheck_match": None}
 
         if not claim and not media_result:
             resp.message(NO_CLAIM_MSG)
@@ -152,7 +164,8 @@ async def whatsapp_webhook(
         verdict = compose_verdict(claim, matches, media_result)
         resp.message(verdict)
 
-    except Exception:
-        resp.message("Samahani, kuna tatizo kwa upande wetu. Tafadhali jaribu tena.")
+    except Exception as e:
+        print(f"[WA] Unexpected error: {type(e).__name__}: {e}")
+        resp.message("Samahani, kuna tatizo la mfumo. Tafadhali jaribu tena baada ya dakika moja.")
 
     return Response(content=str(resp), media_type="text/xml")

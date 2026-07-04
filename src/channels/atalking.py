@@ -4,7 +4,6 @@ from fastapi.responses import PlainTextResponse
 
 from src.engine.claim import extract_claim
 from src.engine.match import match_claim
-from src.engine.verdict import compose_verdict
 
 router = APIRouter(prefix="/webhook")
 
@@ -16,8 +15,7 @@ SMS_WELCOME = (
 )
 
 
-@router.post("/sms", name="sms_webhook")
-@router.post("s/sms", name="sms_webhook_alt")
+@router.post("/sms")
 async def sms_webhook(
     from_: str = Form("", alias="from"),
     to: str = Form(""),

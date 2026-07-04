@@ -21,12 +21,20 @@ Rules:
 - Return ONLY the JSON, no markdown formatting"""
 
 
+STOPWORDS = {"that", "this", "with", "from", "have", "been", "will", "they",
+             "their", "there", "what", "when", "where", "which", "about",
+             "would", "could", "should", "much", "many", "some", "into",
+             "also", "than", "then", "very", "just", "more", "most", "does",
+             "kenya", "government", "built", "build", "made", "make", "said",
+             "year", "years", "million", "billion", "money", "county"}
+
+
 def match_seed_db(claim: str) -> dict | None:
-    """Simple keyword match against seed records."""
+    """Keyword match against seed records. Requires 2+ meaningful word hits."""
     db = sqlite3.connect(str(DB_PATH))
     db.row_factory = sqlite3.Row
-    words = [w for w in re.findall(r'[a-z]+', claim.lower()) if len(w) > 3]
-    if not words:
+    words = [w for w in re.findall(r'[a-z]+', claim.lower()) if len(w) > 3 and w not in STOPWORDS]
+    if len(words) < 2:
         db.close()
         return None
 
@@ -36,20 +44,33 @@ def match_seed_db(claim: str) -> dict | None:
     for w in words:
         params.extend([f"%{w}%"] * 3)
 
-    row = db.execute(
-        f"SELECT * FROM seed_records WHERE {conditions} LIMIT 1", params
-    ).fetchone()
+    rows = db.execute(
+        f"SELECT * FROM seed_records WHERE {conditions}", params
+    ).fetchall()
     db.close()
 
-    if row:
-        return {
-            "source": row["source"],
-            "constituency": row["constituency"],
-            "project": row["project"],
-            "details": row["details"],
-            "url": row["url"],
-        }
-    return None
+    if not rows:
+        return None
+
+    # Score by number of keyword hits — pick best match
+    best, best_score = None, 0
+    for row in rows:
+        text = f"{row['project']} {row['details']} {row['constituency']}".lower()
+        score = sum(1 for w in words if w in text)
+        if score > best_score:
+            best, best_score = row, score
+
+    # Require at least 2 word hits to avoid loose matches
+    if best_score < 2:
+        return None
+
+    return {
+        "source": best["source"],
+        "constituency": best["constituency"],
+        "project": best["project"],
+        "details": best["details"],
+        "url": best["url"],
+    }
 
 
 def match_ai_factcheck(claim: str) -> dict | None:

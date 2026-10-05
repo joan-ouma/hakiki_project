@@ -13,7 +13,7 @@
 | Joan Ouma| Full-Stack Developer | [@joan-ouma](https://github.com/joan-ouma) |
 
 **Team Name:** T004  
-**University:** Addy - Kenyatta University, Joan - Jomo Kenyatta University  
+**University:** Addy - Kenyatta University, Joan - Jomo Kenyatta University of Agriculture and Technology
 
 ---
 

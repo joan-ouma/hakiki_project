@@ -1,4 +1,4 @@
-# Hakiki — The Truth Engine for Kenya's 2027 Elections
+# Hakiki - The Truth Engine for Kenya's 2027 Elections
 
 > Built during the **Democracy & AI Hackathon** — July 4th, 2026
 > Hosted by **Mozilla Foundation** & **KamiLimu**
